@@ -1,5 +1,7 @@
 fastapi
-sqlalchemy
 uvicorn
-python-dotenv
+psycopg2-binary
+sqlalchemy
+grpcio
 grpcio-tools
+python-dotenv
