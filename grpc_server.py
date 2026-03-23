@@ -1,7 +1,7 @@
 import grpc
 from concurrent import futures
 from handlers import ProductService
-from generated.product import product_pb2_grpc
+from app.generated.product import product_pb2_grpc
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))

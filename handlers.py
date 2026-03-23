@@ -2,8 +2,8 @@ import grpc
 from google.protobuf.timestamp_pb2 import Timestamp
 from google.protobuf.empty_pb2 import Empty
 
-from generated.product import product_pb2
-from generated.product import product_pb2_grpc
+from app.generated.product.product_pb2 import product_pb2
+from app.generated.product.product_pb2_grpc import product_pb2_grpc
 
 from datetime import datetime
 from database import get_connection
@@ -187,25 +187,27 @@ class ProductService(product_pb2_grpc.ProductServiceServicer):
         )
     
 
-    def GetProductsByShop(self, request, context):
-
+    def GetProductsFromShopID(self, request, context):
+    
         conn = get_connection()
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT id, seller_id, product_name, product_description,
-                product_price, product_sold, product_date
+            SELECT id, seller_id, product_name, product_description, product_price, product_sold, product_date
             FROM products
             WHERE seller_id = %s
-        """, (request.seller_id,))
+        """, (request.shop_id,)) 
 
         rows = cursor.fetchall()
-
         cursor.close()
         conn.close()
 
-        products = []
+        if not rows:
+            context.set_code(grpc.StatusCode.NOT_FOUND)
+            context.set_details("No products found for this shop")
+            return product_pb2.ProductListResponse(products=[])
 
+        products = []
         for row in rows:
             timestamp = Timestamp()
             timestamp.FromDatetime(row[6])
