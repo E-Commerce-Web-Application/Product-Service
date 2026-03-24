@@ -2,7 +2,7 @@ import threading
 import grpc
 from concurrent import futures
 from handlers import ProductService
-from generated.product import product_pb2_grpc
+from app.generated.product import product_pb2_grpc
 
 from fastapi import FastAPI, HTTPException, Depends
 from typing import Annotated, List
@@ -45,11 +45,12 @@ db_dependency = Annotated[Session, Depends(get_db)]
 @app.post("/products/")
 async def create_product(product: schema.ProductBase, db: db_dependency):
     db_product = models.Products(
-        seller_id=product.seller_id,
+        shop_id=product.shop_id,
         product_name=product.product_name,
         product_description=product.product_description,
         product_price=product.product_price,
-        product_sold=product.product_sold
+        product_sold=product.product_sold,
+        product_review_id=product.product_review_id
     )
     db.add(db_product)
     db.commit()
@@ -79,6 +80,8 @@ async def update_product(product_id: int, product: schema.ProductUpdate, db: db_
     if not db_product:
         raise HTTPException(status_code=404, detail="Product not found")
 
+    if product.shop_id is not None:
+        db_product.shop_id = product.shop_id
     if product.product_name is not None:
         db_product.product_name = product.product_name
     if product.product_description is not None:
@@ -87,6 +90,8 @@ async def update_product(product_id: int, product: schema.ProductUpdate, db: db_
         db_product.product_price = product.product_price
     if product.product_sold is not None:
         db_product.product_sold = product.product_sold
+    if product.product_review_id is not None:
+        db_product.product_review_id = product.product_review_id
 
     db.commit()
     db.refresh(db_product)
@@ -103,10 +108,10 @@ async def delete_product(product_id: int, db: db_dependency):
     db.commit()
     return {"message": "Product Deleted"}
 
-@app.get("/products/shop/{seller_id}", response_model=List[schema.ProductResponse])
-async def get_products_by_shop(seller_id: str, db: db_dependency):
+@app.get("/products/shop/{shop_id}", response_model=List[schema.ProductResponse])
+async def get_products_by_shop(shop_id: str, db: db_dependency):
     products = db.query(models.Products).filter(
-        models.Products.seller_id == seller_id
+        models.Products.shop_id == shop_id
     ).all()
 
     if not products:

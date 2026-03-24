@@ -7,10 +7,11 @@ class Products(Base):
     __tablename__ = 'products'
 
     id = Column(Integer,primary_key=True,index=True)
-    seller_id = Column(String)
+    shop_id = Column(String)
     product_name = Column(String,nullable=False)
     product_description = Column(String,nullable=True)
     product_price = Column(Integer,nullable=False)
     product_sold = Column(Boolean,default=False)
     product_date = Column(DateTime(timezone=True),server_default=func.now())
+    product_review_id = Column(Integer,nullable=True)
     

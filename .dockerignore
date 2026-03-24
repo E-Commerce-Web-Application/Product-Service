@@ -1,0 +1,39 @@
+# Python cache and virtual environments
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.venv/
+venv/
+
+# VCS and local editor metadata
+.git/
+.gitignore
+.DS_Store
+.vscode/
+.idea/
+
+# Local env and tooling caches
+.env
+.env.*
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Logs and local runtime files
+*.log
+
+# Build outputs and generated artifacts
+build/
+dist/
+app/generated/
+
+# Not needed in container build context
+Makefile
+README.md
+protos/README.md
+

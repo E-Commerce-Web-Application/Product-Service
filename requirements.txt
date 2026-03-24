@@ -1,7 +1,8 @@
 fastapi
 uvicorn
-psycopg2-binary
 sqlalchemy
+psycopg2-binary
+python-dotenv
 grpcio
 grpcio-tools
-python-dotenv
+protobuf

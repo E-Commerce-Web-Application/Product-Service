@@ -2,8 +2,8 @@ import grpc
 from google.protobuf.timestamp_pb2 import Timestamp
 from google.protobuf.empty_pb2 import Empty
 
-from app.generated.product.product_pb2 import product_pb2
-from app.generated.product.product_pb2_grpc import product_pb2_grpc
+from app.generated.product import product_pb2
+from app.generated.product import product_pb2_grpc
 
 from datetime import datetime
 from database import get_connection
@@ -19,15 +19,16 @@ class ProductService(product_pb2_grpc.ProductServiceServicer):
 
         cursor.execute("""
             INSERT INTO products
-            (seller_id, product_name, product_description, product_price, product_sold)
-            VALUES (%s,%s,%s,%s,%s)
+            (shop_id, product_name, product_description, product_price, product_sold, product_review_id)
+            VALUES (%s,%s,%s,%s,%s,%s)
             RETURNING id, product_date
         """, (
-            request.seller_id,
+            request.shop_id,
             request.product_name,
             request.product_description,
             request.product_price,
-            request.product_sold
+            request.product_sold,
+            request.product_review_id
     ))
 
         row = cursor.fetchone()
@@ -41,11 +42,12 @@ class ProductService(product_pb2_grpc.ProductServiceServicer):
 
         return product_pb2.ProductResponse(
             id=str(row[0]),
-            seller_id=request.seller_id,
+            shop_id=request.shop_id,
             product_name=request.product_name,
             product_description=request.product_description,
             product_price=request.product_price,
             product_sold=request.product_sold,
+            product_review_id=request.product_review_id,
             product_date=timestamp
     )
 
@@ -55,7 +57,7 @@ class ProductService(product_pb2_grpc.ProductServiceServicer):
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT id,seller_id,product_name,product_description,product_price,product_sold,product_date
+            SELECT id,shop_id,product_name,product_description,product_price,product_sold,product_date,product_review_id
             FROM products WHERE id=%s
         """, (request.product_id,))
 
@@ -74,11 +76,12 @@ class ProductService(product_pb2_grpc.ProductServiceServicer):
 
         return product_pb2.ProductResponse(
             id=str(row[0]),
-            seller_id=row[1],
+            shop_id=row[1],
             product_name=row[2],
             product_description=row[3],
             product_price=row[4],
             product_sold=row[5],
+            product_review_id=row[7] if row[7] is not None else 0,
             product_date=timestamp
         )
 
@@ -88,7 +91,7 @@ class ProductService(product_pb2_grpc.ProductServiceServicer):
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT id,seller_id,product_name,product_description,product_price,product_sold,product_date
+            SELECT id,shop_id,product_name,product_description,product_price,product_sold,product_date,product_review_id
             FROM products
         """)
 
@@ -106,11 +109,12 @@ class ProductService(product_pb2_grpc.ProductServiceServicer):
             products.append(
                 product_pb2.ProductResponse(
                     id=str(row[0]),
-                    seller_id=row[1],
+                    shop_id=row[1],
                     product_name=row[2],
                     product_description=row[3],
                     product_price=row[4],
                     product_sold=row[5],
+                    product_review_id=row[7] if row[7] is not None else 0,
                     product_date=timestamp
                 )
             )
@@ -124,17 +128,21 @@ class ProductService(product_pb2_grpc.ProductServiceServicer):
 
         cursor.execute("""
             UPDATE products
-            SET product_name=%s,
+            SET shop_id=%s,
+                product_name=%s,
                 product_description=%s,
                 product_price=%s,
-                product_sold=%s
+                product_sold=%s,
+                product_review_id=%s
             WHERE id=%s
-            RETURNING id,seller_id,product_name,product_description,product_price,product_sold,product_date
+            RETURNING id,shop_id,product_name,product_description,product_price,product_sold,product_date,product_review_id
         """, (
+            request.shop_id,
             request.product_name,
             request.product_description,
             request.product_price,
             request.product_sold,
+            request.product_review_id,
             request.product_id
         ))
 
@@ -154,11 +162,12 @@ class ProductService(product_pb2_grpc.ProductServiceServicer):
 
         product = product_pb2.ProductResponse(
             id=str(row[0]),
-            seller_id=row[1],
+            shop_id=row[1],
             product_name=row[2],
             product_description=row[3],
             product_price=row[4],
             product_sold=row[5],
+            product_review_id=row[7] if row[7] is not None else 0,
             product_date=timestamp
         )
 
@@ -193,9 +202,9 @@ class ProductService(product_pb2_grpc.ProductServiceServicer):
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT id, seller_id, product_name, product_description, product_price, product_sold, product_date
+            SELECT id, shop_id, product_name, product_description, product_price, product_sold, product_date, product_review_id
             FROM products
-            WHERE seller_id = %s
+            WHERE shop_id = %s
         """, (request.shop_id,)) 
 
         rows = cursor.fetchall()
@@ -215,11 +224,12 @@ class ProductService(product_pb2_grpc.ProductServiceServicer):
             products.append(
                 product_pb2.ProductResponse(
                     id=str(row[0]),
-                    seller_id=row[1],
+                    shop_id=row[1],
                     product_name=row[2],
                     product_description=row[3],
                     product_price=row[4],
                     product_sold=row[5],
+                    product_review_id=row[7] if row[7] is not None else 0,
                     product_date=timestamp
                 )
             )
