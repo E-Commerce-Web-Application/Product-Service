@@ -51,7 +51,7 @@ USER appuser
 
 # Expose ports
 EXPOSE 8000
-EXPOSE 50051
+EXPOSE 50050
 
-# Start FastAPI (you can also start gRPC inside main.py)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000","--reload"]
+
