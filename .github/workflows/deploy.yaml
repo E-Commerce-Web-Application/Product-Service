@@ -5,112 +5,65 @@ on:
     branches: ["main"]
 
 env:
-  AWS_REGION: ${{ secrets.AWS_REGION || vars.AWS_REGION || 'us-east-1' }}
-  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-  EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+  AWS_REGION: ${{secrets.AWS_REGION}}
+  ECR_REPOSITORY: ${{secrets.ECR_REPOSITORY}}
+  EKS_CLUSTER_NAME: ${{secrets.EKS_CLUSTER_NAME}}
   DEPLOYMENT_NAME: product-service
   CONTAINER_NAME: product-service
-  IMAGE_TAG: ${{ github.sha }}
-  PYTHON_VERSION: "3.11"
   K8S_NAMESPACE: product-service
+  IMAGE_TAG: ${{github.sha}}
 
 jobs:
   deploy:
-    name: Build, Scan, and Deploy Product Service
+    name: deploy-product-service
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    permissions:
-      contents: read
-    environment: production
-    env:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        uses: actions/checkout@v5
         with:
           submodules: recursive
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37
+        uses: aws-actions/configure-aws-credentials@v2
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Set up Python for SonarCloud
-        if: env.SONAR_TOKEN != ''
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-
-      - name: Install Python dependencies for SonarCloud
-        if: env.SONAR_TOKEN != ''
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Generate gRPC stubs for SonarCloud
-        if: env.SONAR_TOKEN != ''
-        run: make proto
+          aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
+          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+          aws-region: ${{env.AWS_REGION}}
 
       - name: SonarCloud Scan
-        if: env.SONAR_TOKEN != ''
-        uses: SonarSource/sonarqube-scan-action@v5.0.0
-        with:
-          args: >
-            -Dsonar.token=${{ secrets.SONAR_TOKEN }}
-            -Dsonar.projectKey=E-Commerce-Web-Application_Product-Service
-            -Dsonar.organization=e-commerce-web-application
-            -Dsonar.host.url=https://sonarcloud.io
+        uses: sonarsource/sonarcloud-github-action@v5
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: https://sonarcloud.io
+          SONAR_TOKEN: ${{secrets.SONAR_TOKEN}}
 
       - name: Login to Amazon ECR
         id: ecr-login
-        uses: aws-actions/amazon-ecr-login@19d944daaa35f0fa1d3f7f8af1d3f2e5de25c5b7
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build, tag, and push Docker image
         env:
           REGISTRY: ${{ steps.ecr-login.outputs.registry }}
         run: |
-          docker build -t "$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" .
-          docker push "$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          docker build -t $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - name: Set up kubectl
-        uses: Azure/setup-kubectl@c0c8b32d33a5244f1e5947304550403b63930415
-        with:
-          version: v1.30.0
-
-      - name: Configure kubeconfig for EKS
+      - name: Deploy to EKS
+        env:
+          DATABASE_URL: ${{secrets.DATABASE_URL}}
         run: |
-          aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
+          aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
 
-      - name: Apply base Kubernetes manifests
-        run: |
           kubectl apply -f k8s/namespace.yaml
           kubectl apply -f k8s/services.yaml
 
-      - name: Sync database secret
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: |
           kubectl -n "$K8S_NAMESPACE" create secret generic product-service-secrets \
             --from-literal=DATABASE="$DATABASE_URL" \
             --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Apply deployment manifest
-        run: kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/deployment.yaml
 
-      - name: Deploy to EKS
-        env:
-          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-        run: |
           kubectl -n "$K8S_NAMESPACE" set image deployment/$DEPLOYMENT_NAME \
-            $CONTAINER_NAME=$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+            $CONTAINER_NAME=${{steps.ecr-login.outputs.registry}}/$ECR_REPOSITORY:$IMAGE_TAG
+
           kubectl -n "$K8S_NAMESPACE" rollout restart deployment/$DEPLOYMENT_NAME
 
       - name: Verify deployment
