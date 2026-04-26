@@ -35,7 +35,7 @@ jobs:
           aws-region: ${{env.AWS_REGION}}
 
       - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@v5.0.0
+        uses: SonarSource/sonarqube-scan-action@v7
         with:
           args: >
             -Dsonar.projectKey=E-Commerce-Web-Application_Product-Service
