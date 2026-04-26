@@ -17,9 +17,10 @@ spec:
         app: product-service
         app.kubernetes.io/name: product-service
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: product-service
-          image: product-service:latest
+          image: product-service:1.0.0
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -52,6 +53,7 @@ spec:
             requests:
               cpu: 100m
               memory: 128Mi
+              ephemeral-storage: 1Gi
             limits:
               cpu: 500m
               memory: 512Mi

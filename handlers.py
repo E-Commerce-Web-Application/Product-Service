@@ -7,6 +7,7 @@ from app.generated.product import product_pb2_grpc
 
 from datetime import datetime
 from database import get_connection
+from constants import PRODUCT_NOT_FOUND
 
 
 class ProductService(product_pb2_grpc.ProductServiceServicer):
@@ -68,7 +69,7 @@ class ProductService(product_pb2_grpc.ProductServiceServicer):
 
         if not row:
             context.set_code(grpc.StatusCode.NOT_FOUND)
-            context.set_details("Product not found")
+            context.set_details(PRODUCT_NOT_FOUND)
             return product_pb2.ProductResponse()
 
         timestamp = Timestamp()
@@ -154,7 +155,7 @@ class ProductService(product_pb2_grpc.ProductServiceServicer):
 
         if not row:
             context.set_code(grpc.StatusCode.NOT_FOUND)
-            context.set_details("Product not found")
+            context.set_details(PRODUCT_NOT_FOUND)
             return product_pb2.ProductUpdateResponse()
 
         timestamp = Timestamp()
