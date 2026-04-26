@@ -23,7 +23,7 @@ jobs:
       contents: read
     environment: production
     env:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
 
     steps:
       - name: Checkout
