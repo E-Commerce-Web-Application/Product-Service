@@ -58,7 +58,7 @@ jobs:
 
       - name: SonarCloud Code Scan
         if: env.SONAR_TOKEN != ''
-        uses: sonarsource/sonarcloud-github-action@84384df901918cb6b3c0b06d4d8c8050007db3b6
+        uses: sonarsource/sonarcloud-github-action@ffc3010689be73b8e5ae0c57ce35968afd7909e8
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
@@ -84,7 +84,7 @@ jobs:
 
       - name: Snyk Docker Image Scan
         if: env.SNYK_TOKEN != ''
-        uses: snyk/actions/docker@6f819ca782176a2e264f80a51058d1e6de18d421
+        uses: snyk/actions/docker@9adf32b1121593767fc3c057af55b55db032dc04
         env:
           SNYK_TOKEN: ${{ env.SNYK_TOKEN }}
         with:
