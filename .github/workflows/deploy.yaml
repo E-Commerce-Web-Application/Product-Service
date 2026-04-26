@@ -88,6 +88,16 @@ jobs:
 
       - name: Verify deployment
         run: |
-          kubectl -n "$K8S_NAMESPACE" rollout status deployment/$DEPLOYMENT_NAME --timeout=180s
+          echo "=== Checking rollout status ==="
+          kubectl -n "$K8S_NAMESPACE" rollout status deployment/$DEPLOYMENT_NAME --timeout=180s || {
+            echo "\n=== Rollout failed. Checking pod events ==="
+            kubectl -n "$K8S_NAMESPACE" describe deployment "$DEPLOYMENT_NAME"
+            echo "\n=== Pod status ==="
+            kubectl -n "$K8S_NAMESPACE" get pods -l app=product-service -o wide
+            echo "\n=== Recent pod logs ==="
+            kubectl -n "$K8S_NAMESPACE" logs -l app=product-service --tail=50 --all-containers=true || true
+            exit 1
+          }
+          echo "\n=== Deployment successful ==="
           kubectl -n "$K8S_NAMESPACE" get deployment "$DEPLOYMENT_NAME" -o wide
           kubectl -n "$K8S_NAMESPACE" get pods -l app=product-service -o wide

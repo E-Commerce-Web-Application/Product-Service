@@ -20,7 +20,7 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: product-service
-          image: 382736934164.dkr.ecr.ap-southeast-2.amazonaws.com/product-service
+          image: product-service:latest
           imagePullPolicy: Always
           ports:
             - name: http
