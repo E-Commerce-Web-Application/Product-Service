@@ -11,7 +11,6 @@ env:
   AWS_REGION: ${{secrets.AWS_REGION}}
   ECR_REPOSITORY: ${{secrets.ECR_REPOSITORY}}
   EKS_CLUSTER_NAME: ${{secrets.EKS_CLUSTER_NAME}}
-  SONAR_REGION: ${{secrets.SONAR_REGION || 'eu'}}
   DEPLOYMENT_NAME: product-service
   CONTAINER_NAME: product-service
   K8S_NAMESPACE: product-service
@@ -42,7 +41,6 @@ jobs:
             -Dsonar.projectKey=E-Commerce-Web-Application_Product-Service
             -Dsonar.organization=e-commerce-web-application
             -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.region=${{env.SONAR_REGION}}
         env:
           SONAR_TOKEN: ${{secrets.SONAR_TOKEN}}
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
