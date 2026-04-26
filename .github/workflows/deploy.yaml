@@ -82,7 +82,8 @@ jobs:
           echo "=== Verifying kubectl authentication ==="
           kubectl -n "$K8S_NAMESPACE" auth can-i get pods || {
             echo "ERROR: Unable to authenticate to EKS cluster."
-            echo "The EKS cluster's aws-auth ConfigMap must include the GitHub Actions IAM role."
+            echo "Grant EKS access to the GitHub Actions IAM principal (user or role)."
+            echo "Use EKS Access Entries (preferred) or aws-auth ConfigMap mapping."
             echo "Current AWS identity:"
             aws sts get-caller-identity
             exit 1
@@ -98,14 +99,9 @@ jobs:
             --dry-run=client -o yaml | kubectl apply -f - --validate=false
 
           echo "=== Deploying application ==="
-          kubectl apply -f k8s/deployment.yaml --validate=false
-
-          echo "=== Updating container image ==="
-          kubectl -n "$K8S_NAMESPACE" set image deployment/$DEPLOYMENT_NAME \
-            $CONTAINER_NAME=${{steps.ecr-login.outputs.registry}}/$ECR_REPOSITORY:$IMAGE_TAG
-
-          echo "=== Restarting deployment ==="
-          kubectl -n "$K8S_NAMESPACE" rollout restart deployment/$DEPLOYMENT_NAME
+          kubectl set image -f k8s/deployment.yaml \
+            "$CONTAINER_NAME"=${{steps.ecr-login.outputs.registry}}/$ECR_REPOSITORY:$IMAGE_TAG \
+            --local -o yaml | kubectl apply -f - --validate=false
 
       - name: Verify deployment
         run: |

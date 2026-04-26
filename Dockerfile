@@ -44,7 +44,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY --from=builder /app/app/generated ./app/generated
 
 # Copy application code
-COPY database.py grpc_server.py handlers.py main.py models.py schema.py ./
+COPY constants.py database.py grpc_server.py handlers.py main.py models.py schema.py ./
 
 # Switch to non-root user
 USER appuser
@@ -53,5 +53,5 @@ USER appuser
 EXPOSE 8000
 EXPOSE 50050
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000","--reload"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 
