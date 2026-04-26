@@ -1,3 +1,4 @@
 # Ignore environment file
 .env
 generated
+secret.yaml
