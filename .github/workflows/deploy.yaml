@@ -4,6 +4,9 @@ on:
   push:
     branches: ["main"]
 
+permissions:
+  contents: read
+
 env:
   AWS_REGION: ${{secrets.AWS_REGION}}
   ECR_REPOSITORY: ${{secrets.ECR_REPOSITORY}}
@@ -22,6 +25,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           submodules: recursive
+          fetch-depth: 0
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -39,6 +43,7 @@ jobs:
             -Dsonar.host.url=https://sonarcloud.io
         env:
           SONAR_TOKEN: ${{secrets.SONAR_TOKEN}}
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
       - name: Login to Amazon ECR
         id: ecr-login
