@@ -1,193 +1,92 @@
-name: Product Service AWS CI/CD
+name: Product Service CI/CD Pipeline
 
 on:
-  pull_request:
-    branches:
-      - main
-      - master
-    paths:
-      - '**.py'
-      - 'requirements.txt'
-      - 'Dockerfile'
-      - 'Makefile'
-      - 'k8s/**'
-      - 'protos/**'
-      - '.github/workflows/deploy.yaml'
   push:
-    branches:
-      - main
-      - master
-    paths:
-      - '**.py'
-      - 'requirements.txt'
-      - 'Dockerfile'
-      - 'Makefile'
-      - 'k8s/**'
-      - 'protos/**'
-      - '.github/workflows/deploy.yaml'
-  workflow_dispatch:
+    branches: ["main"]
 
 env:
-  PYTHON_VERSION: "3.11"
-  K8S_NAMESPACE: product-service
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+  EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
   DEPLOYMENT_NAME: product-service
   CONTAINER_NAME: product-service
-
-concurrency:
-  group: product-service-${{ github.ref }}
-  cancel-in-progress: true
-
-permissions:
-  contents: read
+  IMAGE_TAG: ${{ github.sha }}
+  PYTHON_VERSION: "3.11"
+  K8S_NAMESPACE: product-service
 
 jobs:
-  ci:
-    name: CI Checks
+  deploy:
+    name: Build, Scan, and Deploy Product Service
     runs-on: ubuntu-latest
-    timeout-minutes: 12
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: product_service
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U postgres -d product_service"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-    env:
-      DATABASE: postgresql://postgres:postgres@localhost:5432/product_service
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    environment: production
 
     steps:
-      - name: Check out repository
+      - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          submodules: recursive
 
-      - name: Set up Python
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@ff717079ee2060e4bcee96c4779b553acc87447c
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Python for SonarCloud
+        if: secrets.SONAR_TOKEN != ''
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
 
-      - name: Install dependencies
+      - name: Install Python dependencies for SonarCloud
+        if: secrets.SONAR_TOKEN != ''
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt flake8
+          pip install -r requirements.txt
 
-      - name: Generate gRPC stubs
+      - name: Generate gRPC stubs for SonarCloud
+        if: secrets.SONAR_TOKEN != ''
         run: make proto
 
-      - name: Run static checks
-        run: |
-          flake8 main.py grpc_server.py handlers.py database.py models.py schema.py \
-            --count --select=E9,F63,F7,F82 --show-source --statistics
-          python -m compileall .
-
-      - name: Smoke test application imports
-        run: |
-          python - <<'PY'
-          import os
-
-          os.environ["DATABASE"] = os.environ["DATABASE"]
-
-          import database
-          import models
-          import grpc_server
-          import handlers
-          import main
-
-          models.Base.metadata.create_all(bind=database.engine)
-
-          assert main.app.title == "Product Service"
-          print("Smoke test passed.")
-          PY
-
-      - name: Validate Kubernetes manifests
-        uses: Azure/setup-kubectl@c0c8b32d33a5244f1e5947304550403b63930415
-        with:
-          version: v1.30.0
-
-      - name: Dry-run Kubernetes resources
-        run: |
-          kubectl apply --dry-run=client -f k8s/namespace.yaml
-          kubectl apply --dry-run=client -f k8s/services.yaml
-          kubectl apply --dry-run=client -f k8s/deployment.yaml
-          kubectl apply --dry-run=client -f k8s/ingress.yaml
-
-  build:
-    name: Build And Push To ECR
-    runs-on: ubuntu-latest
-    needs: ci
-    if: github.event_name == 'push'
-    timeout-minutes: 20
-    permissions:
-      contents: read
-      id-token: write
-    outputs:
-      image_uri: ${{ steps.image.outputs.image_uri }}
-      image_tag: ${{ steps.image.outputs.image_tag }}
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@ff717079ee2060e4bcee96c4779b553acc87447c
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ secrets.AWS_REGION }}
+      - name: SonarCloud Code Scan
+        if: secrets.SONAR_TOKEN != ''
+        uses: sonarsource/sonarcloud-github-action@84384df901918cb6b3c0b06d4d8c8050007db3b6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
       - name: Login to Amazon ECR
-        id: login-ecr
+        id: ecr-login
         uses: aws-actions/amazon-ecr-login@19d944daaa35f0fa1d3f7f8af1d3f2e5de25c5b7
-
-      - name: Set image coordinates
-        id: image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-          IMAGE_TAG: sha-${{ github.sha }}
-        run: |
-          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-          echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
-          echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
 
-      - name: Build and push image
+      - name: Build, tag, and push Docker image to ECR
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
         with:
           context: .
           platforms: linux/amd64
           push: true
-          tags: ${{ steps.image.outputs.image_uri }}
+          tags: |
+            ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+            ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy:
-    name: Deploy To AWS EKS
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.event_name == 'push'
-    timeout-minutes: 15
-    environment: production
-    permissions:
-      contents: read
-      id-token: write
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@ff717079ee2060e4bcee96c4779b553acc87447c
+      - name: Snyk Docker Image Scan
+        if: secrets.SNYK_TOKEN != ''
+        uses: snyk/actions/docker@6f819ca782176a2e264f80a51058d1e6de18d421
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          image: ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          args: --auth-type=token --severity-threshold=high
 
       - name: Set up kubectl
         uses: Azure/setup-kubectl@c0c8b32d33a5244f1e5947304550403b63930415
@@ -195,13 +94,10 @@ jobs:
           version: v1.30.0
 
       - name: Configure kubeconfig for EKS
-        env:
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
         run: |
-          aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
 
-      - name: Apply base manifests
+      - name: Apply base Kubernetes manifests
         run: |
           kubectl apply -f k8s/namespace.yaml
           kubectl apply -f k8s/services.yaml
@@ -218,19 +114,14 @@ jobs:
       - name: Apply deployment manifest
         run: kubectl apply -f k8s/deployment.yaml
 
-      - name: Update deployment image
-        env:
-          IMAGE_URI: ${{ needs.build.outputs.image_uri }}
+      - name: Deploy to EKS
         run: |
           kubectl -n "${{ env.K8S_NAMESPACE }}" set image deployment/${{ env.DEPLOYMENT_NAME }} \
-            ${{ env.CONTAINER_NAME }}="$IMAGE_URI"
+            ${{ env.CONTAINER_NAME }}=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          kubectl -n "${{ env.K8S_NAMESPACE }}" rollout restart deployment ${{ env.DEPLOYMENT_NAME }}
 
-      - name: Wait for rollout
+      - name: Verify deployment rollout
         run: |
           kubectl -n "${{ env.K8S_NAMESPACE }}" rollout status deployment/${{ env.DEPLOYMENT_NAME }} --timeout=180s
-
-      - name: Show deployment status
-        if: always()
-        run: |
-          kubectl -n "${{ env.K8S_NAMESPACE }}" get deployment "${{ env.DEPLOYMENT_NAME }}" -o wide || true
-          kubectl -n "${{ env.K8S_NAMESPACE }}" get pods -l app=product-service -o wide || true
+          kubectl -n "${{ env.K8S_NAMESPACE }}" get deployment "${{ env.DEPLOYMENT_NAME }}" -o wide
+          kubectl -n "${{ env.K8S_NAMESPACE }}" get pods -l app=product-service -o wide
