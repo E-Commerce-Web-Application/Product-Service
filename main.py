@@ -7,7 +7,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from fastapi.middleware.cors import CORSMiddleware
 import models, schema
 from database import engine, SessionLocal, DATABASE_HOST
-from constants import PRODUCT_NOT_FOUND, PRODUCT_NOT_FOUND_RESPONSES
+from constants import (
+    PRODUCT_CREATE_ERROR_RESPONSES,
+    PRODUCT_NOT_FOUND,
+    PRODUCT_NOT_FOUND_RESPONSES,
+)
 
 # Import gRPC server function
 from grpc_server import serve as start_grpc_server
@@ -56,7 +60,11 @@ db_dependency = Annotated[Session, Depends(get_db)]
 
 
 
-@app.post("/products/", response_model=schema.ProductResponse)
+@app.post(
+    "/products/",
+    response_model=schema.ProductResponse,
+    responses=PRODUCT_CREATE_ERROR_RESPONSES,
+)
 async def create_product(product: schema.ProductBase, db: db_dependency):
     try:
         db_product = models.Products(
