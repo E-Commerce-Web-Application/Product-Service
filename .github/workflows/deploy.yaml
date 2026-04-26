@@ -39,7 +39,6 @@ concurrency:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   ci:
@@ -124,6 +123,9 @@ jobs:
     needs: ci
     if: github.event_name == 'push'
     timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
     outputs:
       image_uri: ${{ steps.image.outputs.image_uri }}
       image_tag: ${{ steps.image.outputs.image_tag }}
@@ -173,6 +175,9 @@ jobs:
     if: github.event_name == 'push'
     timeout-minutes: 15
     environment: production
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Check out repository
