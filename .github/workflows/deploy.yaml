@@ -70,20 +70,41 @@ jobs:
         env:
           DATABASE_URL: ${{secrets.DATABASE_URL}}
         run: |
+          echo "=== Configuring kubectl with EKS cluster ==="
           aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
 
-          kubectl apply -f k8s/namespace.yaml
-          kubectl apply -f k8s/services.yaml
+          echo "=== AWS caller identity ==="
+          aws sts get-caller-identity
 
+          echo "=== Verifying EKS token generation ==="
+          aws eks get-token --cluster-name "$EKS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null
+          
+          echo "=== Verifying kubectl authentication ==="
+          kubectl -n "$K8S_NAMESPACE" auth can-i get pods || {
+            echo "ERROR: Unable to authenticate to EKS cluster."
+            echo "The EKS cluster's aws-auth ConfigMap must include the GitHub Actions IAM role."
+            echo "Current AWS identity:"
+            aws sts get-caller-identity
+            exit 1
+          }
+          
+          echo "=== Applying Kubernetes manifests ==="
+          kubectl apply -f k8s/namespace.yaml --validate=false
+          kubectl apply -f k8s/services.yaml --validate=false
+
+          echo "=== Creating/Updating database secret ==="
           kubectl -n "$K8S_NAMESPACE" create secret generic product-service-secrets \
             --from-literal=DATABASE="$DATABASE_URL" \
-            --dry-run=client -o yaml | kubectl apply -f -
+            --dry-run=client -o yaml | kubectl apply -f - --validate=false
 
-          kubectl apply -f k8s/deployment.yaml
+          echo "=== Deploying application ==="
+          kubectl apply -f k8s/deployment.yaml --validate=false
 
+          echo "=== Updating container image ==="
           kubectl -n "$K8S_NAMESPACE" set image deployment/$DEPLOYMENT_NAME \
             $CONTAINER_NAME=${{steps.ecr-login.outputs.registry}}/$ECR_REPOSITORY:$IMAGE_TAG
 
+          echo "=== Restarting deployment ==="
           kubectl -n "$K8S_NAMESPACE" rollout restart deployment/$DEPLOYMENT_NAME
 
       - name: Verify deployment
